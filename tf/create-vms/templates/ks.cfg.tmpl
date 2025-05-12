@@ -1,0 +1,33 @@
+# Use text mode install
+text
+cdrom
+repo --name="AppStream" --baseurl={{ iso_image_path }}
+keyboard us
+timezone UTC --utc
+# Root user (optional)
+rootpw --plaintext {{ vm_user_pwd }}
+# Create a user 'core' with password 'vm_user_pwd'
+user --name={{ vm_user }} --password={{ vm_user_pwd }} --plaintext --gecos="Core User"
+# Enable DHCP networking on first interface
+network --bootproto=dhcp --device=eth0 --onboot=on --hostname={{ item }}
+# Disable initial setup UI and set SELinux and firewall
+firstboot --disable
+firewall --enabled --service=ssh
+selinux --enforcing
+# Set bootloader and disk partitioning
+bootloader --location=mbr
+autopart --type=plain
+zerombr
+clearpart --all --initlabel
+# Enable SSH
+services --enabled=sshd
+# Skip user interaction
+eula --agreed
+reboot
+%packages
+@^minimal-environment
+openssh-server
+%end
+
+
+

@@ -1,0 +1,52 @@
+#-----------------------------------------------------
+# name: build-cluster.yml
+#kvm-cluster/
+#├── build-cluster.yml
+#├── roles/
+#    └── kvm-cluster/
+#        ├── tasks/
+#        │   ├── main.yml
+#        ├── templates/
+#            ├── ks.cfg.j2
+#        ├── vars
+#     │      ├── main.yml  
+# This playbook automates creation of a kvm base
+# virtualized cluster of 4 VMs and LB
+# 
+# By Jesus Natividad Rodriguez A
+# May 2025, License: MIT
+# How to use it:
+# play  name: build-cluster.yml
+# ansible-playbook build-cluster.yml -e infra=?
+#----------------------------------------------------
+---
+- name: Provisioning of a KVM base cluster of VMs
+  hosts: localhost
+  connection: local
+  collections:
+    - kubernetes.core
+  # vars_prompt:
+  #   - name: your_username
+  #     prompt: "Enter user name of host admin"
+  #     default: "root"
+  #     private: no
+  #   - name: your_password
+  #     prompt: "Enter user password for admin account"
+  #     private: yes
+  #   # - name: operator_name
+  #   #   prompt: "Enter the name of the operator, if installing from the cluster's internal Operator Hub"
+  #   #   default: "local-storage-operator"
+  #   #   private: no
+  #   # - name: namespace
+  #   #   prompt: "Enter namespace for operator to be installed"
+  #   #   default: "openshift-local-storage"
+  #   #   private: no
+  # vars:
+  #   ocp_username: "{{ your_username }}"
+  #   ocp_password: "{{ your_password }}"
+  vars_files:   # we use variable to no having to use inventory.yml file
+    - "{{ playbook_dir }}/vars/main.yml"
+
+  roles:
+    - all
+

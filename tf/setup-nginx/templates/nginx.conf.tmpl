@@ -1,0 +1,60 @@
+# Upstreams
+# -------------------
+upstream openshift_api {
+    {% for vm in vm_name %}
+    server {{ vm }}:6443;
+    {% endfor %}
+}
+
+upstream openshift_apps_https {
+    {% for vm in vm_name %}
+    server {{ vm }}:443;
+    {% endfor %}
+}
+
+# -------------------
+# HTTP Redirect
+# -------------------
+server {
+    listen 80;
+    #server_name api.cluster.domain *.apps.cluster.domain;
+    server_name api.kvm-cluster.home.com *.apps.{{ cluster_name }}.{{ cluster_domain }};
+
+    return 301 https://$host$request_uri;
+}
+
+# -------------------
+# API Server Proxy
+# -------------------
+server {
+    listen 443 ssl;
+    server_name api.{{ cluster_name }}.{{ cluster_domain }};
+
+    ssl_certificate {{ ca_cert_path }};
+    ssl_certificate_key {{ ca_cert_key }};
+
+    location / {
+        proxy_pass https://openshift_api;
+        proxy_ssl_verify off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+# -------------------
+# Apps Wildcard Proxy
+# -------------------
+server {
+    listen 443 ssl;
+    server_name *.apps.{{ cluster_name }}.{{ cluster_domain }};
+
+    ssl_certificate {{ ca_cert_path }};
+    ssl_certificate_key {{ ca_cert_key }};
+
+    location / {
+        proxy_pass https://openshift_apps_https;
+        proxy_ssl_verify off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}

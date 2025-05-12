@@ -1,0 +1,142 @@
+
+# ------------------------------------------------------------------
+# This play creates the number of requested VMs and tech spec for them
+# and install the request OS version and required storage source capacity.
+#
+# Jesus Natividad Rodriguez A, MIT license
+# May 2025
+# name: create-vms.yml
+# ansible-playbook build-cluster.yml -e infra=create
+# ------------------------------------------------------------------
+---
+- name: Check if {{ bridge_name }} bridge exists using ip link
+  command: ip link show {{ bridge_name }}
+  register: bridge_check
+  ignore_errors: yes
+
+- name: Show bridge status
+  debug:
+    msg: >-
+      {{
+        'Bridge ' + bridge_name + ' exists'
+        if bridge_check.rc == 0 else
+        'Bridge ' + bridge_name + ' does not exist'
+      }}
+
+# As the bridge should exist before provisioning the VMs, I created this block
+# to be executed conditioned to the existence of the default bridge: virbr0
+- block:
+  - name: Render kickstart configs for each VM
+    become: yes 
+    template:
+      src: ks.cfg.j2
+      dest: "{{ kickstart_path }}/ks_{{ item }}.cfg"
+    loop: "{{ vm_name }}"
+
+  # we will render the kickstart file using python server on port 8000 or defined one
+  - name: Allow port 8000/tcp through UFW
+    become: yes 
+    ufw:
+      rule: allow
+      port: "{{ python_port }}"
+      proto: tcp
+
+  - name: Ensure {{ kickstart_path }} directory exists
+    become: yes 
+    file:
+      path: "{{ kickstart_path }}"
+      state: directory
+      mode: '0755'
+
+  - name: Create systemd service to serve kickstart files
+    become: yes 
+    copy:
+      dest: /etc/systemd/system/ks_http_server.service
+      content: |
+        [Unit]
+        Description=Kickstart file HTTP server on port 8000
+        After=network.target
+
+        [Service]
+        WorkingDirectory={{ kickstart_path }}
+        ExecStart=/usr/bin/python3 -m http.server 8000
+        Restart=always
+
+        [Install]
+        WantedBy=multi-user.target
+
+  - name: Start and enable kickstart HTTP server
+    become: yes 
+    systemd:
+      name: ks_http_server
+      enabled: yes
+      state: started
+
+  - name: Create VM disk for each VM
+    become: yes 
+    command: >
+      qemu-img create -f qcow2 {{ disk_dir }}/{{ item }}.qcow2 {{ vm_master_disk }}
+    loop: "{{ vm_name }}"
+    args:
+      creates: "{{ disk_dir }}/{{ item }}.qcow2"
+
+  - name: Create VMs using virt-install
+    become: yes 
+    command: >
+      virt-install
+      --name {{ item }}
+      --ram {{ vm_master_memory }}
+      --vcpus {{ vm_master_vcpu }}
+      --disk path={{ disk_dir }}/{{ item }}.qcow2,size=300,bus=virtio
+      --os-variant {{ vm_base_os }}
+      --network bridge={{ bridge_name }}
+      --graphics none
+      --console pty,target_type=serial
+      --location {{ iso_image_path }}
+      --extra-args "inst.text console=ttyS0,115200n8 inst.ks=http://{{ host_ip }}:8000/ks_{{ item }}.cfg"
+      --noautoconsole
+    loop: "{{ vm_name }}"
+    register: vm_install
+
+  - name: Retrieve each VM's IP using nslookup
+    shell: "nslookup {{ item }} | awk '/^Address: / { print $2 }' | tail -n1"
+    register: vm_ips
+    loop: "{{ vm_name }}"
+    loop_control:
+      label: "{{ item }}"
+    changed_when: false
+
+  - name: Display VM IPs
+    debug:
+      var: vm_ips
+
+  - name: Create a dictionary of VM names and their IPs
+    set_fact:
+      vm_ip_map: >-
+        {{
+          dict(
+            vm_ips.results
+            | selectattr('rc', 'equalto', 0)
+            | rejectattr('stdout', 'equalto', '')
+            | map(attribute='item')
+            | zip(vm_ips.results
+                  | selectattr('rc', 'equalto', 0)
+                  | rejectattr('stdout', 'equalto', '')
+                  | map(attribute='stdout'))
+          )
+        }}
+  - name: Display VM IPs
+    debug:
+      var: vm_ip_map
+
+  # The following task objectives could be accomplished through DNS resolution.
+  - name: Add VM host entries to /etc/hosts, to enable NGINX server resolution
+    become: yes 
+    lineinfile:
+      path: /etc/hosts
+      line: "{{ item.value }}    {{ item.key }}"
+      state: present
+      create: yes
+      insertafter: EOF
+    loop: "{{ vm_ip_map | dict2items }}"
+  when: bridge_check.rc == 0

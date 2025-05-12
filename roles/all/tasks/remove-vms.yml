@@ -1,0 +1,87 @@
+# ------------------------------------------------------------------
+# Play to remove all created VMs; it does  not delete any other resource.
+#
+# Jesus Natividad Rodriguez A, MIT license
+# May 2025
+# play name: remove-vms.yml
+# ansible-playbook build-cluster.yml -e infra=destroy
+# ------------------------------------------------------------------
+---
+- name: Check if which VM exists in virsh list
+  shell: "virsh list --all | grep -w {{ item }}"
+  register: vm_check_results
+  ignore_errors: true
+  loop: "{{ vm_name }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Show status of each VM
+  debug:
+    msg: >-
+      {{
+        'VM exists: ' + item.item
+        if item.rc == 0 else
+        'VM was removed: ' + item.item
+      }}
+  loop: "{{ vm_check_results.results }}"
+
+- name: Set flag if any VM still exists
+  set_fact:
+    any_vm_exists: true
+  when: vm_check_results.results | selectattr('rc', 'equalto', 0) | list | length > 0
+
+- name: Default flag if no VM exists
+  set_fact:
+    any_vm_exists: false
+  when: any_vm_exists is not defined
+
+# Block executed only if any VM exists
+- block:
+  # With the following tasks, we suppress the errors messages:
+  - name: Destroy all VMs silently
+    shell: "virsh destroy {{ item }} 2>/dev/null || true"
+    loop: "{{ vm_name }}"
+    changed_when: false
+
+  - name: Undefine and remove all storage for each VM silently
+    shell: "virsh undefine {{ item }} --remove-all-storage 2>/dev/null || true"
+    loop: "{{ vm_name }}"
+    changed_when: false
+
+  - name: Check if each VM exists in virsh list
+    shell: "virsh list --all | grep -w {{ item }}"
+    register: vm_check_results
+    ignore_errors: true
+    loop: "{{ vm_name }}"
+    loop_control:
+      label: "{{ item }}"
+
+  - name: Show status of each VM
+    debug:
+      msg: >-
+        {{
+          'VM exists: ' + item.item
+          if item.rc == 0 else
+          'VM was removed: ' + item.item
+        }}
+    loop: "{{ vm_check_results.results }}"
+
+  - name: Stat the openshift-cluster symlink
+    stat:
+      path: /etc/nginx/sites-enabled/openshift-cluster
+    register: openshift_symlink
+
+  - name: Remove broken or circular openshift-cluster symlink if it exists
+    file:
+      path: /etc/nginx/sites-enabled/openshift-cluster
+      state: absent
+    become: true
+    when: openshift_symlink.stat.islnk is defined and openshift_symlink.stat.islnk
+
+  - name: Remove symbolic link for NGINX site config
+    ansible.builtin.file:
+      path: "{{ nginx_config_path }}"
+      state: absent
+    become: true
+
+  when: any_vm_exists == true

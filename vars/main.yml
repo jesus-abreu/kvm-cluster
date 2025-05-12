@@ -1,0 +1,56 @@
+# ------------------------------------------------------------------
+# This play stores all the variables defined the the playbook
+#
+# Jesus Natividad Rodriguez A, MIT license
+# May 2025
+# play name: main.yml
+# ------------------------------------------------------------------
+# Section for cluster infra and VMs
+host_ip: "192.168.1.246"
+load_balancer_ip: "192.168.1.246"
+host_name: "data-science"
+netmask: "255.255.255.0"
+cluster_name: "kvm-cluster"
+cluster_domain: "home.com"
+network_name: "openshift-network"
+#default bridge name:
+bridge_name: "virbr0"
+subnet_ip: "192.168.122.0/24"
+ca_cert_path: "/etc/ssl/certs/ocp-apps.crt"
+ca_cert_key: "/etc/ssl/private/ocp-apps.key"
+ca_cert_name: "registry-ca"
+username: "devops"
+password: ""
+nginx_config_path: "/etc/nginx/sites-available/openshift-cluster"
+nginx_url: "http://{{ load_balancer_ip }}" 
+load_balancer_port: "80"
+
+tag: “{{ version }}"
+# varialbles for operators"
+catalog_source_namespace: "openshift-marketplace"
+vm_name:
+- "vm1"  # OpenShift Master 1
+- "vm2"  # OpenShift Master 2
+- "vm3"  # OpenShift Master 3 IP
+- "vm4"  # boostrap VM
+expected_backends: "{{ vm_name }}"
+ocp_hostname:
+- "master1"  # OpenShift Master 1
+- "master2"  # OpenShift Master 2
+- "master3"  # OpenShift Master 3 IP
+- "bootstrap"
+
+vm_user: "core"
+vm_user_pwd: "TrustN@1"
+openshift_api: "https://192.168.1.246:6443"
+# Default values for VM provisioning
+vm_master_memory: 16384  # 16GB RAM
+vm_master_vcpu: 4        # 4 vCPUs
+vm_master_disk: 300G     # 300G Disk for Master Nodes
+vm_base_os: "rhel9.5"
+kickstart_path: "/var/lib/libvirt/dvd"
+iso_image_path: "{{ kickstart_path }}/rhel-9.5-x86_64-dvd.iso"
+disk_dir: "/var/lib/libvirt/images/"
+python_server: "python3 -m http.server"
+python_port: "8000"
+nginx_dest_path: ""

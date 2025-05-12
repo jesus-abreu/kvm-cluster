@@ -1,0 +1,12 @@
+---
+- include_tasks: test-infra.yml
+  when: infra == "test"
+
+- include_tasks: create-vms.yml
+  when: infra == "create"
+
+- include_tasks: setup-nginx-load-balance.yml
+  when: infra == "lb-setup"
+
+- include_tasks: remove-vms.yml
+  when: infra == "destroy"

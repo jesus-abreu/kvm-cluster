@@ -1,0 +1,94 @@
+# ------------------------------------------------------------------
+# To test NGINX load balance services for created VMs in the  host.
+# We only know the VMs name, but the ip.
+#
+# Jesus Natividad Rodriguez A, MIT license
+# May 2025
+# play name: test-infra.yml
+# ansible-playbook build-cluster.yml -e infra=test
+# ------------------------------------------------------------------
+- name: Check if {{ bridge_name }} bridge exists using ip link
+  command: ip link show {{ bridge_name }}
+  register: bridge_check
+  ignore_errors: yes
+
+- name: Show bridge status
+  debug:
+    msg: >-
+      {{
+        'Bridge ' + bridge_name + ' exists'
+        if bridge_check.rc == 0 else
+        'Bridge ' + bridge_name + ' does not exist'
+      }}
+
+- block:
+  - name: Retrieve IP addresses of VMs
+    shell: "nslookup {{ item }} | awk '/^Address: / { print $2 }' | tail -n1"
+    register: vm_ips
+    loop: "{{ vm_name }}"
+    loop_control:
+      label: "{{ item }}"
+    changed_when: false
+
+  - name: Create a dictionary of VM names and their IPs
+    set_fact:
+      vm_ip_map: >-
+        {{
+          dict(
+            vm_ips.results
+            | selectattr('rc', 'equalto', 0)
+            | rejectattr('stdout', 'equalto', '')
+            | map(attribute='item')
+            | zip(vm_ips.results
+                  | selectattr('rc', 'equalto', 0)
+                  | rejectattr('stdout', 'equalto', '')
+                  | map(attribute='stdout'))
+          )
+        }}
+  - name: Display VM IPs
+    debug:
+      var: vm_ip_map
+
+  - name: Set facts for VM names and IPs
+    set_fact:
+      vm_info: >-
+        [{% for name, ip in vm_name | zip(vm_ips.results | map(attribute='stdout') | list) %}
+          {"name": "{{ name }}", "ip": "{{ ip }}"}
+        {% if not loop.last %},{% endif %}
+        {% endfor %}]
+
+  - name: Test NGINX load balancer for each VM
+    uri:
+      url: "http://{{ load_balancer_ip }}:{{ load_balancer_port }}"
+      return_content: yes
+    register: nginx_response
+    until: nginx_response.status == 200
+    retries: 3
+    delay: 5
+
+  - debug: 
+      msg: "{{ vm_info }}"
+
+  - name: Initialize normalized vm_info
+    set_fact:
+      vm_info_normalized: []
+
+  - name: Normalize IPs
+    set_fact:
+      vm_info_normalized: >-
+        {{ vm_info_normalized + [
+          item | combine({
+            'ip_list': item.ip.split() | list
+          })
+        ] }}
+    loop: "{{ vm_info }}"
+
+  - name: Display responding VM
+    debug:
+      msg: >
+        The following VMs responded successfully:
+        {% for vm in vm_info_normalized %}
+        - Name: {{ vm.name }}, IP: {{ vm.ip }}
+        {% endfor %}
+  when: bridge_check.rc == 0
+
