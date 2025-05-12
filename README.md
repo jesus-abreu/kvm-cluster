@@ -18,3 +18,5 @@ I will take advantage of my previous experience building servers and will put to
 10.	Setup NGINX a s external load balancer, running in the host.
 11.	And will create a set of testing scripts to verify functionality.
 
+To download the articles source code do:
+$ git clone https://github.com/jesus-abreu/kvm-cluster.git <your target foler>
