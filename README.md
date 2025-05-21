@@ -20,3 +20,7 @@ I will take advantage of my previous experience building servers and will put to
 
 To download the articles source code do:
 $ git clone https://github.com/jesus-abreu/kvm-cluster.git <your target foler>
+
+Article url in LinkedIn:
+https://www.linkedin.com/pulse/how-create-cluster-vms-using-kvm-hypervisor-part-2-rodriguez-abreu-sq2ie?trackingId=maYY3GuZQ8uCOLncwlmImQ%3D%3D&lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base%3BSR77A7IgRMuPm7kTOCJ3qw%3D%3D
+
