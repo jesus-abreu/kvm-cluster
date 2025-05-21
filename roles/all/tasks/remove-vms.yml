@@ -4,18 +4,18 @@
 # Jesus Natividad Rodriguez A, MIT license
 # May 2025
 # play name: remove-vms.yml
-# ansible-playbook build-cluster.yml -e infra=destroy
+# sudo ansible-playbook build-cluster.yml -e infra=destroy
 # ------------------------------------------------------------------
 ---
-- name: Check if which VM exists in virsh list
+- name: (remove-vms.yml):Check if which VM exists in virsh list
   shell: "virsh list --all | grep -w {{ item }}"
   register: vm_check_results
   ignore_errors: true
-  loop: "{{ vm_name }}"
+  loop: "{{ vm_names }}"
   loop_control:
     label: "{{ item }}"
 
-- name: Show status of each VM
+- name: (remove-vms.yml):Show status of each VM
   debug:
     msg: >-
       {{
@@ -25,12 +25,12 @@
       }}
   loop: "{{ vm_check_results.results }}"
 
-- name: Set flag if any VM still exists
+- name: (remove-vms.yml):Set flag if any VM still exists
   set_fact:
     any_vm_exists: true
   when: vm_check_results.results | selectattr('rc', 'equalto', 0) | list | length > 0
 
-- name: Default flag if no VM exists
+- name: (remove-vms.yml):Default flag if no VM exists
   set_fact:
     any_vm_exists: false
   when: any_vm_exists is not defined
@@ -38,25 +38,25 @@
 # Block executed only if any VM exists
 - block:
   # With the following tasks, we suppress the errors messages:
-  - name: Destroy all VMs silently
+  - name: (remove-vms.yml):Destroy all VMs silently
     shell: "virsh destroy {{ item }} 2>/dev/null || true"
-    loop: "{{ vm_name }}"
+    loop: "{{ vm_names }}"
     changed_when: false
 
-  - name: Undefine and remove all storage for each VM silently
+  - name: (remove-vms.yml):Undefine and remove all storage for each VM silently
     shell: "virsh undefine {{ item }} --remove-all-storage 2>/dev/null || true"
-    loop: "{{ vm_name }}"
+    loop: "{{ vm_names }}"
     changed_when: false
 
-  - name: Check if each VM exists in virsh list
+  - name: (remove-vms.yml):Check if each VM exists in virsh list
     shell: "virsh list --all | grep -w {{ item }}"
     register: vm_check_results
     ignore_errors: true
-    loop: "{{ vm_name }}"
+    loop: "{{ vm_names }}"
     loop_control:
       label: "{{ item }}"
 
-  - name: Show status of each VM
+  - name: (remove-vms.yml):Show status of each VM
     debug:
       msg: >-
         {{
@@ -65,23 +65,87 @@
           'VM was removed: ' + item.item
         }}
     loop: "{{ vm_check_results.results }}"
-
-  - name: Stat the openshift-cluster symlink
-    stat:
-      path: /etc/nginx/sites-enabled/openshift-cluster
-    register: openshift_symlink
-
-  - name: Remove broken or circular openshift-cluster symlink if it exists
-    file:
-      path: /etc/nginx/sites-enabled/openshift-cluster
-      state: absent
-    become: true
-    when: openshift_symlink.stat.islnk is defined and openshift_symlink.stat.islnk
-
-  - name: Remove symbolic link for NGINX site config
-    ansible.builtin.file:
-      path: "{{ nginx_config_path }}"
-      state: absent
-    become: true
-
   when: any_vm_exists == true
+
+- name: (remove-vms.yml):Stat the openshift-cluster symlink
+  stat:
+    path: /etc/nginx/sites-enabled/openshift-cluster
+  register: openshift_symlink
+
+- name: (remove-vms.yml):Remove broken or circular openshift-cluster symlink if it exists
+  file:
+    path: /etc/nginx/sites-enabled/openshift-cluster
+    state: absent
+  become: true
+  when: openshift_symlink.stat.islnk is defined and openshift_symlink.stat.islnk
+
+- name: (remove-vms.yml):Remove symbolic link for NGINX site config
+  ansible.builtin.file:
+    path: "{{ nginx_config_path }}"
+    state: absent
+  become: true
+
+- name: (remove-vms.yml):Check if nginx is running
+  shell: systemctl is-active nginx
+  register: nginx_status
+  ignore_errors: true
+  changed_when: false
+
+- name: (remove-vms.yml):Stop nginx if running
+  service:
+    name: nginx
+    state: stopped
+    enabled: false
+  when: nginx_status.rc == 0
+  become: true
+
+- name: (remove-vms.yml)Backup /etc/hosts before modifying
+  become: true
+  copy:
+    src: /etc/hosts
+    dest: /etc/hosts.bak
+    remote_src: true
+
+- name: (remove-vms.yml) Remove all /etc/hosts lines containing any vm_name
+  become: true
+  shell: >
+    grep -Ev "{{ vm_names | map('regex_escape') | join('|') }}" /etc/hosts > ./hosts.cleaned
+  ignore_errors: true
+
+- name: (remove-vms.yml)Overwrite /etc/hosts with cleaned version
+  become: true
+  shell: mv -f ./hosts.cleaned /etc/hosts
+  register: mv_result
+  ignore_errors: true
+  changed_when: mv_result.rc == 0
+
+- name: (remove-vms.yml)Confirm success message
+  debug:
+    msg: "/etc/hosts was updated to remove entries for: {{ vm_names | join(', ') }}"
+  when: mv_result.rc == 0
+
+- name: (remove-vms.yml)Remove all /etc/hosts lines starting with {{ host_ip }}
+  become: true
+  shell: >
+    grep -Ev "^{{ host_ip | regex_escape() }}[[:space:]]" /etc/hosts > ./hosts.cleaned
+  ignore_errors: true
+
+- name: (remove-vms.yml)Force overwrite ./hosts.cleaned with cleaned version
+  become: true
+  shell: mv -f ./hosts.cleaned /etc/hosts
+  register: mv_result
+  ignore_errors: true
+  changed_when: mv_result.rc == 0
+  failed_when: mv_result.rc != 0
+
+- name: (remove-vms.yml)Confirm success message for /etc/hosts overwrite
+  debug:
+    msg: "/etc/hosts was successfully updated by replacing it with ./hosts.cleaned"
+  when: mv_result.rc == 0
+
+- name: (remove-vms.yml)Truncate virbr0.status to clean old DHCP lease data
+  become: true
+  ansible.builtin.command: truncate -s 0 /var/lib/libvirt/dnsmasq/virbr0.status
+  args:
+    removes: /var/lib/libvirt/dnsmasq/virbr0.status  # Ensures the file exists before running
+

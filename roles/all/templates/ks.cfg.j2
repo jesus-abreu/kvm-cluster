@@ -1,12 +1,13 @@
 # Use text mode install
 text
 cdrom
-repo --name="AppStream" --baseurl={{ iso_image_path }}
+repo --name="AppStream" --baseurl=file:///run/install/repo/AppStream
+lang en_US.UTF-8
 keyboard us
 timezone UTC --utc
 # Root user (optional)
 rootpw --plaintext {{ vm_user_pwd }}
-# Create a user 'core' with password 'vm_user_pwd'
+# Create a user 'core' with password '123456'
 user --name={{ vm_user }} --password={{ vm_user_pwd }} --plaintext --gecos="Core User"
 # Enable DHCP networking on first interface
 network --bootproto=dhcp --device=eth0 --onboot=on --hostname={{ item }}
@@ -28,4 +29,3 @@ reboot
 @^minimal-environment
 openssh-server
 %end
-

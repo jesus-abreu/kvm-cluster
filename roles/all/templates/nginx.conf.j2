@@ -1,13 +1,13 @@
 # Upstreams
 # -------------------
 upstream openshift_api {
-    {% for vm in vm_name %}
+    {% for vm in vm_names %}
     server {{ vm }}:6443;
     {% endfor %}
 }
 
 upstream openshift_apps_https {
-    {% for vm in vm_name %}
+    {% for vm in vm_names %}
     server {{ vm }}:443;
     {% endfor %}
 }

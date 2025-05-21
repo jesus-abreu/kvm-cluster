@@ -1,0 +1,45 @@
+
+# ------------------------------------------------------------------
+# This play creates the number of requested VMs and tech spec for them
+# and install the request OS version and required storage source capacity.
+#
+# Jesus Natividad Rodriguez A, MIT license
+# May 2025
+# name: create_single_vm.yml
+# ansible-playbook build-cluster.yml -e infra=create
+# ------------------------------------------------------------------
+---
+- name: (create_single_vm.yml)Create VM {{ vm_item }} using virt-install
+  become: true
+  ansible.builtin.command: >
+    virt-install
+    --name {{ vm_item }}
+    --ram {{ vm_master_memory }}
+    --vcpus {{ vm_master_vcpu }}
+    --disk path={{ disk_dir }}/{{ vm_item }}.qcow2,size=300,bus=virtio
+    --os-variant {{ vm_base_os }}
+    --network bridge={{ bridge_name }}
+    --graphics none
+    --console pty,target_type=serial
+    --location {{ iso_image_path }}
+    --extra-args "inst.text console=ttyS0,115200n8 inst.ks=http://{{ host_ip }}:8000/ks_{{ vm_item }}.cfg"
+    --noautoconsole
+  register: vm_result
+
+- name: (create_single_vm.yml)Wait 30 seconds for VM {{ vm_item }} to get DHCP IP
+  ansible.builtin.pause:
+    seconds: 30
+
+- name: (create_single_vm.yml)Extract IP for VM {{ vm_item }} from virbr0.status
+  become: true
+  ansible.builtin.command: >
+    bash -c '
+      sleep 60
+      cat /var/lib/libvirt/dnsmasq/virbr0.status |
+      jq -r ".[] | \"\(.\"ip-address\")\""
+    '
+  register: vm_ip_result
+
+- name: (create_single_vm.yml)Extract only the most recent IP address for {{ vm_item }}
+  set_fact:
+    vm_ip_map: "{{ vm_ip_map | default({}) | combine({ vm_item: (vm_ip_result.stdout_lines | last) }) }}"

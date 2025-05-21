@@ -71,12 +71,12 @@ variable "ca_cert_name" {
 
 variable "username" {
   type    = string
-  default = "devops"
+  default = "core"
 }
 
 variable "password" {
   type    = string
-  default = ""
+  default = "TrustN@1"
   sensitive = true
 }
 
@@ -111,7 +111,7 @@ variable "catalog_source_namespace" {
   default = "openshift-marketplace"
 }
 
-variable "vm_name" {
+variable "vm_names" {
   type    = list(string)
   default = ["vm1", "vm2", "vm3", "vm4"]
 }

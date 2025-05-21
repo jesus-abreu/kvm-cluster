@@ -1,15 +1,15 @@
 # Use text mode install
 text
 cdrom
-repo --name="AppStream" --baseurl={{ iso_image_path }}
+repo --name="AppStream" --baseurl=file:///run/install/repo/AppStream
 keyboard us
 timezone UTC --utc
 # Root user (optional)
-rootpw --plaintext {{ vm_user_pwd }}
+rootpw --plaintext ${ vm_user_pwd }
 # Create a user 'core' with password 'vm_user_pwd'
-user --name={{ vm_user }} --password={{ vm_user_pwd }} --plaintext --gecos="Core User"
+user --name=${vm_user} --password=${vm_user_pwd} --plaintext --gecos="Core User"
 # Enable DHCP networking on first interface
-network --bootproto=dhcp --device=eth0 --onboot=on --hostname={{ item }}
+network --hostname=${vm_name} --bootproto=dhcp --device=eth0 --onboot=on
 # Disable initial setup UI and set SELinux and firewall
 firstboot --disable
 firewall --enabled --service=ssh
@@ -23,7 +23,7 @@ clearpart --all --initlabel
 services --enabled=sshd
 # Skip user interaction
 eula --agreed
-reboot
+reboot --eject
 %packages
 @^minimal-environment
 openssh-server

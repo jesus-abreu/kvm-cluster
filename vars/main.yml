@@ -22,18 +22,19 @@ ca_cert_name: "registry-ca"
 username: "devops"
 password: ""
 nginx_config_path: "/etc/nginx/sites-available/openshift-cluster"
+nginx_config_path_enabled: "/etc/nginx/sites-enabled/openshift-cluster"
 nginx_url: "http://{{ load_balancer_ip }}" 
 load_balancer_port: "80"
 
 tag: “{{ version }}"
 # varialbles for operators"
 catalog_source_namespace: "openshift-marketplace"
-vm_name:
+vm_names:
 - "vm1"  # OpenShift Master 1
 - "vm2"  # OpenShift Master 2
 - "vm3"  # OpenShift Master 3 IP
 - "vm4"  # boostrap VM
-expected_backends: "{{ vm_name }}"
+expected_backends: "{{ vm_names }}"
 ocp_hostname:
 - "master1"  # OpenShift Master 1
 - "master2"  # OpenShift Master 2

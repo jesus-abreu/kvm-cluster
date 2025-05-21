@@ -84,6 +84,10 @@ variable "nginx_config_path" {
   type    = string
   default = "/etc/nginx/sites-available/openshift-cluster"
 }
+variable "nginx_config_path_enabled" {
+  type    = string
+  default = "/etc/nginx/sites-enabled/openshift-cluster"
+}
 
 variable "nginx_conf_template" {
   type    = string
@@ -111,7 +115,7 @@ variable "catalog_source_namespace" {
   default = "openshift-marketplace"
 }
 
-variable "vm_name" {
+variable "vm_names" {
   type    = list(string)
   default = ["vm1", "vm2", "vm3", "vm4"]
 }

@@ -7,16 +7,16 @@
 # Jesus Natividad Rodriguez A, MIT license
 # May 2025
 # play name: setup-nginx-load-balance.yml
-# ansible-playbook build-cluster.yml -e infra=lb-setup
+# sudo ansible-playbook build-cluster.yml -e infra=lb-setup
 # ------------------------------------------------------------------
 ---
-- name: Check if Nginx apps certificate exists
+- name: (setup-nginx-load-balance.yml)Check if Nginx apps certificate exists
   ansible.builtin.stat:
     path: "{{ ca_cert_path }}"
   register: cert_stat
   become: true
 
-- name: Remove existing Nginx apps certificate and key
+- name: (setup-nginx-load-balance.yml)Remove existing Nginx apps certificate and key
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -26,7 +26,7 @@
   when: cert_stat.stat.exists
   become: true
 
-- name: Generate self-signed wildcard certificate for Nginx apps
+- name: (setup-nginx-load-balance.yml)Generate self-signed wildcard certificate for Nginx apps
   ansible.builtin.command: >
     openssl req -x509 -nodes -days 365
     -newkey rsa:2048
@@ -36,39 +36,40 @@
     -addext "subjectAltName=DNS:*.apps.{{ cluster_name }}.{{ cluster_domain }}"
   become: true
 
-- name: Install/upgrade NGINX as LB/reverse proxy
+- name: (setup-nginx-load-balance.yml)Install/upgrade NGINX as LB/reverse proxy
   apt:
     name: nginx
     state: latest       # latest guarantee to upgrade if present.
     #update_cache: yes   # Update apt cache before installation
 
-- name: Create NGINX load balancer configuration file
+- name: (setup-nginx-load-balance.yml)Create NGINX load balancer configuration file
   template:
     src: nginx.conf.j2  # Path to your Jinja2 config template file
     dest: "{{ nginx_config_path }}"  # Destination path for the config file
+  become: true
 
-- name: Create symbolic link for NGINX site config
+- name: (setup-nginx-load-balance.yml)Create symbolic link for NGINX site config
   ansible.builtin.file:
     src: "{{ nginx_config_path }}"
-    dest: "{{ nginx_config_path }}"
+    dest: "{{ nginx_config_path_enabled }}"
     state: link
     force: yes
   become: true
 
-- name: Test NGINX configuration
+- name: (setup-nginx-load-balance.yml)Test NGINX configuration
   ansible.builtin.command: nginx -t
   register: nginx_test
   # failed_when: "'successful' not in nginx_test.stdout"
   # changed_when: false
   become: true
 
-- name: Restart NGINX service
+- name: (setup-nginx-load-balance.yml)Restart NGINX service
   ansible.builtin.service:
     name: nginx
     state: restarted
   become: true
 
-- name: Reload NGINX service
+- name: (setup-nginx-load-balance.yml)Reload NGINX service
   ansible.builtin.service:
     name: nginx
     state: reloaded

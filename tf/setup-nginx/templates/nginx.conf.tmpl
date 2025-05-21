@@ -1,15 +1,15 @@
 # Upstreams
 # -------------------
 upstream openshift_api {
-    {% for vm in vm_name %}
-    server {{ vm }}:6443;
-    {% endfor %}
+%{ for vm in var.vm_names ~}
+    server ${vm}:6443;
+%{ endfor ~}
 }
 
 upstream openshift_apps_https {
-    {% for vm in vm_name %}
-    server {{ vm }}:443;
-    {% endfor %}
+%{ for vm in var.vm_names ~}
+    server ${vm}:443;
+%{ endfor ~}
 }
 
 # -------------------
@@ -17,8 +17,7 @@ upstream openshift_apps_https {
 # -------------------
 server {
     listen 80;
-    #server_name api.cluster.domain *.apps.cluster.domain;
-    server_name api.kvm-cluster.home.com *.apps.{{ cluster_name }}.{{ cluster_domain }};
+    server_name api.${var.cluster_name}.${var.cluster_domain} *.apps.${var.cluster_name}.${var.cluster_domain};
 
     return 301 https://$host$request_uri;
 }
@@ -28,10 +27,10 @@ server {
 # -------------------
 server {
     listen 443 ssl;
-    server_name api.{{ cluster_name }}.{{ cluster_domain }};
+    server_name api.${var.cluster_name}.${var.cluster_domain};
 
-    ssl_certificate {{ ca_cert_path }};
-    ssl_certificate_key {{ ca_cert_key }};
+    ssl_certificate ${var.ca_cert_path};
+    ssl_certificate_key ${var.ca_cert_key};
 
     location / {
         proxy_pass https://openshift_api;
@@ -46,13 +45,13 @@ server {
 # -------------------
 server {
     listen 443 ssl;
-    server_name *.apps.{{ cluster_name }}.{{ cluster_domain }};
+    server_name *.apps.${var.cluster_name}.${var.cluster_domain};
 
-    ssl_certificate {{ ca_cert_path }};
-    ssl_certificate_key {{ ca_cert_key }};
+    ssl_certificate ${var.ca_cert_path};
+    ssl_certificate_key ${var.ca_cert_key};
 
     location / {
-        proxy_pass https://openshift_apps_https;
+        proxy_pass https://openshift_app;
         proxy_ssl_verify off;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

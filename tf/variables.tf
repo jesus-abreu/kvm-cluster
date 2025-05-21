@@ -6,6 +6,11 @@
 // ------------------------------------------------------------------
 
 // Cluster infra and VMs
+
+variable "my_path" {
+  default = "."
+}
+
 variable "host_ip" {
   description = "Host IP for services and load balancer"
   type        = string
@@ -85,6 +90,11 @@ variable "nginx_config_path" {
   default = "/etc/nginx/sites-available/openshift-cluster"
 }
 
+variable "nginx_config_path_enabled" {
+  type    = string
+  default = "/etc/nginx/sites-enabled/openshift-cluster"
+}
+
 variable "nginx_conf_template" {
   type    = string
   default = "nginx.conf.j2"
@@ -110,8 +120,10 @@ variable "catalog_source_namespace" {
   type    = string
   default = "openshift-marketplace"
 }
-
-variable "vm_name" {
+variable "vm_nam" {
+  type = string
+}
+variable "vm_names" {
   type    = list(string)
   default = ["vm1", "vm2", "vm3", "vm4"]
 }
@@ -162,7 +174,9 @@ variable "vm_base_os" {
   default = "rhel9.5"
 }
 
-variable "kickstart_path" {
+variable "kickstart_path" { default = "." }
+
+variable "kickstart_path_Old" {
   type    = string
   default = "/var/lib/libvirt/dvd"
 }
@@ -177,22 +191,7 @@ variable "disk_dir" {
   default = "/var/lib/libvirt/images/"
 }
 
-variable "python_server" {
-  type    = string
-  default = "python3 -m http.server"
-}
+variable "python_server" { default = "python3 -m http.server" }
+variable python_port { default = "8000" }
+variable "nginx_dest_path" { default = "" }
 
-variable "python_port" {
-  type    = string
-  default = "8000"
-}
-
-variable "nginx_dest_path" {
-  type    = string
-  default = ""
-}
-
-variable "kickstart_template" {
-  type    = string
-  default = "templates/ks.cfg.tmpl"
-}

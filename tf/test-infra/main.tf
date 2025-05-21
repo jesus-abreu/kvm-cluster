@@ -2,7 +2,7 @@
 // Terraform module: ./modules/test-infra/main.tf
 // Author: Jesus Natividad Rodriguez A, MIT license
 // Date: May 2025
-// To execute: 
+// To execute: #${base64decode(data.external.nginx_response.result.response_b64)}
 // ------------------------------------------------------------------
 
 terraform {
@@ -19,10 +19,26 @@ locals {
   bridge_operstate_file = "/sys/class/net/${var.bridge_name}/operstate"
   bridge_exists         = fileexists(local.bridge_operstate_file) && trimspace(chomp(file(local.bridge_operstate_file))) != ""
 }
+# Start the VMs if not running:
+resource "null_resource" "start_vms_if_needed" {
+  for_each = toset(var.vm_names)
+
+  provisioner "local-exec" {
+    command = <<EOT
+      state=$(virsh domstate ${each.key} 2>/dev/null | tr -d '\r')
+      if [ "$state" != "running" ]; then
+        echo "Starting VM ${each.key}..."
+        virsh start ${each.key}
+      else
+        echo "VM ${each.key} is already running."
+      fi
+    EOT
+  }
+}
 
 # Resolve IPs in-memory using external data source
 data "external" "vm_ips" {
-  for_each = toset(var.vm_name)
+  for_each = toset(var.vm_names)
 
   program = [
     "bash", "-c", <<-EOF
@@ -56,16 +72,20 @@ data "external" "nginx_response" {
 # Output map of VM name -> IP
 output "vm_ip_map" {
   value = {
-    for name in var.vm_name :
+    for name in var.vm_names :
     name => data.external.vm_ips[name].result.ip
   }
 }
 
 # Output NGINX response
-output "nginx_response" {
-  value       = base64decode(data.external.nginx_response.result.response_b64)
-  description = "Raw NGINX response body"
+output "nginx_response_raw_result" {
+  value = data.external.nginx_response.result
 }
+
+#output "nginx_response" {
+#  value       = base64decode(data.external.nginx_response.result.response_b64)
+#  description = "Raw NGINX response body"
+#}
 
 
 # Output bridge status
@@ -81,12 +101,11 @@ output "nginx_test_report" {
 Bridge status: ${local.bridge_exists ? "Bridge ${var.bridge_name} exists" : "Bridge ${var.bridge_name} does not exist"}
 
 Resolved VM IPs:
-%{ for name in var.vm_name ~}
+%{ for name in var.vm_names ~}
 - ${name}: ${data.external.vm_ips[name].result.ip}
 %{ endfor ~}
 
 NGINX Response:
-${base64decode(data.external.nginx_response.result.response_b64)}
+  
 EOT
 }
-
